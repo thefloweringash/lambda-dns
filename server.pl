@@ -179,7 +179,7 @@ sub substitute {
     my $rhs = $app->[2];
     my $body = $app->[1][2];
     substitute_worker($body, 1, $rhs);
-    while (@$app) { pop @$app; }
+    $#{$app} = -1;
     map { push @$app, $_ } @$body;
 }
 
@@ -187,7 +187,7 @@ sub substitute_worker {
     my ($term, $depth, $replacement) = @_;
     if ($term->[0] eq "var") {
 	if ($term->[1] == $depth) {
-	    while (@$term) { pop @$term; }
+	    $#{$term} = -1;
 	    map { push @$term, $_ }
 	    @{deep_copy_term_incr_depth($replacement, $depth-1)};
 	}
