@@ -28,6 +28,7 @@ sub reply_handler {
 	    if (defined $lambda_expr) {
 		Lambda::to_debruijn($lambda_expr);
 		Lambda::singlestep($lambda_expr);
+		Lambda::from_debruijn($lambda_expr);
 		my $reduced = Lambda::show($lambda_expr);
 		$reduced =~ s/\\/\\\\/g;
 		$rcode = "NOERROR";
@@ -56,6 +57,9 @@ sub run {
 }
 
 package Lambda;
+
+my @all_syms =
+    split(//,'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz');
 
 my $grammar = q{
 var: /[A-Za-z]/
@@ -159,14 +163,15 @@ sub to_debruijn {
 sub from_debruijn {
     my ($term, $bindings) = @_;
     if (!defined $bindings) {
+	alpha_fix($term);
 	$bindings = [];
     }
     if ($term->[0] eq "application") {
 	from_debruijn($term->[1], $bindings);
 	from_debruijn($term->[2], $bindings);
     } elsif ($term->[0] eq "var") {
-	my $n = $bindings - $term->[1] - 1;
-	$term->[1] = $bindings->[@$bindings - $term->[1]];
+	$term->[1] = $bindings->[$#{$bindings} + 1 - $term->[1]]
+	    or die;
     } elsif ($term->[0] eq "abstraction") {
 	push @$bindings, $term->[1][1];
 	from_debruijn($term->[2], $bindings);
@@ -181,6 +186,50 @@ sub substitute {
     substitute_worker($body, 1, $rhs);
     $#{$app} = -1;
     map { push @$app, $_ } @$body;
+}
+
+sub alpha_fix {
+    my ($term, $bindings, $syms) = @_;
+    if (!defined $bindings) {
+	$bindings = [];
+	$syms = +{map { $_ => undef } @all_syms};
+	dfs_walk( sub {
+	    my ($term) = @_;
+	    if ($term->[0] eq "abstraction") {
+		delete $syms->{$term->[1][1]};
+	    }}, $term);
+	$syms = [keys %$syms];
+    }
+    if ($term->[0] eq "application") {
+	alpha_fix($term->[1], $bindings, $syms);
+	alpha_fix($term->[2], $bindings, $syms);
+    } elsif ($term->[0] eq "var") {
+	my $self = $#{$bindings} + 1 - $term->[1];
+	my $binding = $bindings->[$self];
+	my @rest = @{$bindings}[$self+1 .. $#{$bindings}];
+	for my $outer (@rest) {
+	    if ($outer->[1] eq $binding->[1]) {
+		$binding->[0][1][1] = pop @$syms;
+		last;
+	    }
+	}
+    } elsif ($term->[0] eq "abstraction") {
+	push @$bindings, [$term, $term->[1][1]];
+	alpha_fix($term->[2], $bindings, $syms);
+	pop @$bindings;
+    }
+}
+
+sub dfs_walk {
+    my ($op, $term) = @_;
+    &$op($term);
+    if ($term->[0] eq "application") {
+	dfs_walk($op, $term->[1]);
+	dfs_walk($op, $term->[2]);
+    } elsif ($term->[0] eq "abstraction") {
+	dfs_walk($op, $term->[2]);
+    }
+
 }
 
 sub substitute_worker {
@@ -225,6 +274,9 @@ sub hack {
     my $parsed = Lambda::parse($expr);
 
 #     print ::Dumper($parsed);
+
+#     Lambda::walk_dfs( sub { print Lambda::show($_[0]), "\n" }, $parsed );
+
     print(Lambda::show($parsed), "\n");
     Lambda::to_debruijn($parsed);
     print(Lambda::show($parsed), "\n");
