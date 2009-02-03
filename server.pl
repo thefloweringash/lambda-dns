@@ -11,6 +11,7 @@ use Net::DNS::Nameserver;
 package Main;
 
 my $domain = "lambda.cons.org.nz";
+my $final_ip = "216.218.210.82";
 
 sub reply_handler {
     my ($qname, $qclass, $qtype, $peerhost, $query, $conn) = @_;
@@ -18,7 +19,12 @@ sub reply_handler {
 
     my $happy = 0;
     eval {
-	if ($qtype eq "A" && $qname =~ /^(.*)\.lambda\.cons\.org\.nz$/) {
+	if ($qtype eq "A" && $qname eq "nf.lambda.cons.org.nz") {
+	    $rcode = "NOERROR";
+	    push @ans,
+	    Net::DNS::RR->new("nf.$domain 60 $qclass A $final_ip");
+	    $happy = 1;
+	} elsif ($qtype eq "A" && $qname =~ /^(.*)\.lambda\.cons\.org\.nz$/) {
 	    # ugh
 	    my $e = $1;
 	    $e =~ s/\\\\/\\/g;
@@ -27,14 +33,22 @@ sub reply_handler {
 	    my $lambda_expr = Lambda::parse($e);
 	    if (defined $lambda_expr) {
 		Lambda::to_debruijn($lambda_expr);
-		Lambda::singlestep($lambda_expr);
-		Lambda::from_debruijn($lambda_expr);
-		my $reduced = Lambda::show($lambda_expr);
-		$reduced =~ s/\\/\\\\/g;
-		$rcode = "NOERROR";
-		push @ans,
-		Net::DNS::RR->new("$qname 60 $qclass CNAME $reduced.$domain");
-		$happy = 1
+		my $changed = Lambda::singlestep($lambda_expr);
+		if ($changed) {
+		    Lambda::from_debruijn($lambda_expr);
+		    my $reduced = Lambda::show($lambda_expr);
+		    $reduced =~ s/\\/\\\\/g;
+		    $rcode = "NOERROR";
+		    push @ans,
+		    Net::DNS::RR->new("$qname 60 $qclass CNAME $reduced.$domain");
+		} else {
+		    $rcode = "NOERROR";
+		    push @ans,
+		    Net::DNS::RR->new("$qname 60 $qclass CNAME nf.$domain");
+		    push @ans,
+		    Net::DNS::RR->new("nf.$domain 60 $qclass A $final_ip");
+		}
+		$happy = 1;
 	    }
 	}
     };
