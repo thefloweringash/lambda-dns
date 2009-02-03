@@ -252,7 +252,7 @@ sub substitute_worker {
 	if ($term->[1] == $depth) {
 	    $#{$term} = -1;
 	    map { push @$term, $_ }
-	    @{deep_copy_term_incr_depth($replacement, $depth-1)};
+	    @{deep_copy_term_incr_depth($replacement, $depth-1, 0)};
 	}
     } elsif ($term->[0] eq "application") {
 	substitute_worker($term->[1], $depth, $replacement);
@@ -263,17 +263,21 @@ sub substitute_worker {
 }
 
 sub deep_copy_term_incr_depth {
-    my ($term, $depth) = @_;
+    my ($term, $depth, $localdepth) = @_;
     if ($term->[0] eq "var") {
-	[ "var", $term->[1]+$depth ];
+	if ($term->[1] > $localdepth) {
+	    [ "var", $term->[1]+$depth ];
+	} else {
+	    [ "var", $term->[1] ];
+	}
     } elsif ($term->[0] eq "application") {
 	[ "application",
-	  deep_copy_term_incr_depth($term->[1], $depth),
-	  deep_copy_term_incr_depth($term->[2], $depth) ];
+	  deep_copy_term_incr_depth($term->[1], $depth, $localdepth),
+	  deep_copy_term_incr_depth($term->[2], $depth, $localdepth) ];
     } elsif ($term->[0] eq "abstraction") {
 	[ "abstraction",
 	  [@{$term->[1]}],
-	  deep_copy_term_incr_depth($term->[2], $depth) ];
+	  deep_copy_term_incr_depth($term->[2], $depth, $localdepth+1) ];
     }
 }
 
