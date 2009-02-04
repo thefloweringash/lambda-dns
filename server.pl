@@ -19,41 +19,41 @@ sub reply_handler {
 
     my $happy = 0;
     eval {
-	if ($qtype eq "A" && $qname eq "nf.lambda.cons.org.nz") {
-	    $rcode = "NOERROR";
-	    push @ans,
-	    Net::DNS::RR->new("nf.$domain 60 $qclass A $final_ip");
-	    $happy = 1;
-	} elsif ($qtype eq "A" && $qname =~ /^(.*)\.lambda\.cons\.org\.nz$/) {
-	    # ugh
-	    my $e = $1;
-	    $e =~ s/\\\\/\\/g;
-	    $e =~ s/\\\(/\(/g;
-	    $e =~ s/\\\)/\)/g;
-	    my $lambda_expr = Lambda::parse($e);
-	    if (defined $lambda_expr) {
-		Lambda::to_debruijn($lambda_expr);
-		my $changed = Lambda::singlestep($lambda_expr);
-		if ($changed) {
-		    Lambda::from_debruijn($lambda_expr);
-		    my $reduced = Lambda::show($lambda_expr);
-		    $reduced =~ s/\\/\\\\/g;
-		    $rcode = "NOERROR";
-		    push @ans,
-		    Net::DNS::RR->new("$qname 60 $qclass CNAME $reduced.$domain");
-		} else {
-		    $rcode = "NOERROR";
-		    push @ans,
-		    Net::DNS::RR->new("$qname 60 $qclass CNAME nf.$domain");
-		    push @ans,
-		    Net::DNS::RR->new("nf.$domain 60 $qclass A $final_ip");
-		}
-		$happy = 1;
-	    }
-	}
+        if ($qtype eq "A" && $qname eq "nf.lambda.cons.org.nz") {
+            $rcode = "NOERROR";
+            push @ans,
+            Net::DNS::RR->new("nf.$domain 60 $qclass A $final_ip");
+            $happy = 1;
+        } elsif ($qtype eq "A" && $qname =~ /^(.*)\.lambda\.cons\.org\.nz$/) {
+            # ugh
+            my $e = $1;
+            $e =~ s/\\\\/\\/g;
+            $e =~ s/\\\(/\(/g;
+            $e =~ s/\\\)/\)/g;
+            my $lambda_expr = Lambda::parse($e);
+            if (defined $lambda_expr) {
+                Lambda::to_debruijn($lambda_expr);
+                my $changed = Lambda::singlestep($lambda_expr);
+                if ($changed) {
+                    Lambda::from_debruijn($lambda_expr);
+                    my $reduced = Lambda::show($lambda_expr);
+                    $reduced =~ s/\\/\\\\/g;
+                    $rcode = "NOERROR";
+                    push @ans,
+                    Net::DNS::RR->new("$qname 60 $qclass CNAME $reduced.$domain");
+                } else {
+                    $rcode = "NOERROR";
+                    push @ans,
+                    Net::DNS::RR->new("$qname 60 $qclass CNAME nf.$domain");
+                    push @ans,
+                    Net::DNS::RR->new("nf.$domain 60 $qclass A $final_ip");
+                }
+                $happy = 1;
+            }
+        }
     };
     unless ($happy) {
-	$rcode = "NXDOMAIN";
+        $rcode = "NXDOMAIN";
     }
 
     return ($rcode, \@ans, \@auth, \@add, { aa => 1 });
@@ -62,10 +62,10 @@ sub reply_handler {
 
 sub run {
     my $ns = Net::DNS::Nameserver->new(
-	LocalPort => 5053,
-	ReplyHandler => \&Main::reply_handler,
-	Verbose => 0,
-	) || die "couldn't create ns";
+        LocalPort => 5053,
+        ReplyHandler => \&Main::reply_handler,
+        Verbose => 0,
+        ) || die "couldn't create ns";
 
     $ns->main_loop;
 }
@@ -77,19 +77,19 @@ my @all_syms =
 
 my $grammar = q{
 var: /[A-Za-z]/
-	{ $return = [ "var", $item[1] ] }
+        { $return = [ "var", $item[1] ] }
 
 abstraction: "(" ( "\\\\" | "^" ) var "." term ")"
-	{ $return = [ "abstraction", $item[3], $item[5] ] }
+        { $return = [ "abstraction", $item[3], $item[5] ] }
 
 term: (abstraction | var | bracketed )(s)
-	{ $return = Lambda::foldl1(\\&Lambda::app, $item[1]) }
+        { $return = Lambda::foldl1(\\&Lambda::app, $item[1]) }
 
 bracketed: "(" term ")"
-	{ $return = $item[2] }
+        { $return = $item[2] }
 
 toplevel: term /$/
-	{ $return = $item[1] }
+        { $return = $item[1] }
 };
 
 my $parser = new Parse::RecDescent($grammar);
@@ -103,7 +103,7 @@ sub foldl1 {
     my ($f, $xs) = @_;
     my $x = shift @$xs;
     while (@$xs) {
-	$x = &$f($x, shift @$xs);
+        $x = &$f($x, shift @$xs);
     }
     $x;
 }
@@ -116,19 +116,19 @@ sub parse {
 sub show {
     my ($term) = @_;
     if ($term->[0] eq "abstraction") {
-	"(^" . $term->[1][1] . "." .  show($term->[2]) . ")";
+        "(^" . $term->[1][1] . "." .  show($term->[2]) . ")";
     } elsif ($term->[0] eq "var") {
-	$term->[1];
+        $term->[1];
     } elsif ($term->[0] eq "application") {
-	my $tail;
-	if ($term->[2][0] eq "application") {
-	    $tail = "(" . show($term->[2]) . ")";
-	} else {
-	    $tail = show($term->[2]);
-	}
-	show($term->[1]) . $tail;
+        my $tail;
+        if ($term->[2][0] eq "application") {
+            $tail = "(" . show($term->[2]) . ")";
+        } else {
+            $tail = show($term->[2]);
+        }
+        show($term->[1]) . $tail;
     } else {
-	die "Invalid lambda term structure";
+        die "Invalid lambda term structure";
     }
 }
 
@@ -136,18 +136,18 @@ sub singlestep {
     my ($term) = @_;
 
     if ($term->[0] eq "application") {
-	if ($term->[1][0] eq "abstraction")  {
-	    substitute($term);
-	    return 1;
-	} else {
-	    my $ret = singlestep($term->[1]);
-	    if ($ret == 1) { return 1; };
-	    return singlestep($term->[2]);
-	}
+        if ($term->[1][0] eq "abstraction")  {
+            substitute($term);
+            return 1;
+        } else {
+            my $ret = singlestep($term->[1]);
+            if ($ret == 1) { return 1; };
+            return singlestep($term->[2]);
+        }
     } elsif ($term->[0] eq "abstraction") {
-	singlestep($term->[2]);
+        singlestep($term->[2]);
     } else {
-	return 0;
+        return 0;
     }
 }
 
@@ -159,37 +159,37 @@ sub incr_binders {
 sub to_debruijn {
     my ($term, $binders) = @_;
     if (!defined $binders) {
-	$binders = {};
+        $binders = {};
     }
     if ($term->[0] eq "application") {
-	to_debruijn($term->[1], $binders);
-	to_debruijn($term->[2], $binders);
+        to_debruijn($term->[1], $binders);
+        to_debruijn($term->[2], $binders);
     } elsif ($term->[0] eq "var") {
-	my $n = $binders->{$term->[1]} or die "Invalid lambda term";
-	$term->[1] = $n;
+        my $n = $binders->{$term->[1]} or die "Invalid lambda term";
+        $term->[1] = $n;
     } elsif ($term->[0] eq "abstraction") {
-	$binders->{$term->[1][1]} = 0;
-	$binders = incr_binders($binders);
-	to_debruijn($term->[2], $binders);
+        $binders->{$term->[1][1]} = 0;
+        $binders = incr_binders($binders);
+        to_debruijn($term->[2], $binders);
     }
 }
 
 sub from_debruijn {
     my ($term, $bindings) = @_;
     if (!defined $bindings) {
-	alpha_fix($term);
-	$bindings = [];
+        alpha_fix($term);
+        $bindings = [];
     }
     if ($term->[0] eq "application") {
-	from_debruijn($term->[1], $bindings);
-	from_debruijn($term->[2], $bindings);
+        from_debruijn($term->[1], $bindings);
+        from_debruijn($term->[2], $bindings);
     } elsif ($term->[0] eq "var") {
-	$term->[1] = $bindings->[$#{$bindings} + 1 - $term->[1]]
-	    or die;
+        $term->[1] = $bindings->[$#{$bindings} + 1 - $term->[1]]
+            or die;
     } elsif ($term->[0] eq "abstraction") {
-	push @$bindings, $term->[1][1];
-	from_debruijn($term->[2], $bindings);
-	pop @$bindings;
+        push @$bindings, $term->[1][1];
+        from_debruijn($term->[2], $bindings);
+        pop @$bindings;
     }
 }
 
@@ -205,32 +205,32 @@ sub substitute {
 sub alpha_fix {
     my ($term, $bindings, $syms) = @_;
     if (!defined $bindings) {
-	$bindings = [];
-	$syms = +{map { $_ => undef } @all_syms};
-	dfs_walk( sub {
-	    my ($term) = @_;
-	    if ($term->[0] eq "abstraction") {
-		delete $syms->{$term->[1][1]};
-	    }}, $term);
-	$syms = [keys %$syms];
+        $bindings = [];
+        $syms = +{map { $_ => undef } @all_syms};
+        dfs_walk( sub {
+            my ($term) = @_;
+            if ($term->[0] eq "abstraction") {
+                delete $syms->{$term->[1][1]};
+            }}, $term);
+        $syms = [keys %$syms];
     }
     if ($term->[0] eq "application") {
-	alpha_fix($term->[1], $bindings, $syms);
-	alpha_fix($term->[2], $bindings, $syms);
+        alpha_fix($term->[1], $bindings, $syms);
+        alpha_fix($term->[2], $bindings, $syms);
     } elsif ($term->[0] eq "var") {
-	my $self = $#{$bindings} + 1 - $term->[1];
-	my $binding = $bindings->[$self];
-	my @rest = @{$bindings}[$self+1 .. $#{$bindings}];
-	for my $outer (@rest) {
-	    if ($outer->[1] eq $binding->[1]) {
-		$binding->[0][1][1] = pop @$syms;
-		last;
-	    }
-	}
+        my $self = $#{$bindings} + 1 - $term->[1];
+        my $binding = $bindings->[$self];
+        my @rest = @{$bindings}[$self+1 .. $#{$bindings}];
+        for my $outer (@rest) {
+            if ($outer->[1] eq $binding->[1]) {
+                $binding->[0][1][1] = pop @$syms;
+                last;
+            }
+        }
     } elsif ($term->[0] eq "abstraction") {
-	push @$bindings, [$term, $term->[1][1]];
-	alpha_fix($term->[2], $bindings, $syms);
-	pop @$bindings;
+        push @$bindings, [$term, $term->[1][1]];
+        alpha_fix($term->[2], $bindings, $syms);
+        pop @$bindings;
     }
 }
 
@@ -238,10 +238,10 @@ sub dfs_walk {
     my ($op, $term) = @_;
     &$op($term);
     if ($term->[0] eq "application") {
-	dfs_walk($op, $term->[1]);
-	dfs_walk($op, $term->[2]);
+        dfs_walk($op, $term->[1]);
+        dfs_walk($op, $term->[2]);
     } elsif ($term->[0] eq "abstraction") {
-	dfs_walk($op, $term->[2]);
+        dfs_walk($op, $term->[2]);
     }
 
 }
@@ -249,35 +249,35 @@ sub dfs_walk {
 sub substitute_worker {
     my ($term, $depth, $replacement) = @_;
     if ($term->[0] eq "var") {
-	if ($term->[1] == $depth) {
-	    $#{$term} = -1;
-	    map { push @$term, $_ }
-	    @{deep_copy_term_incr_depth($replacement, $depth-1, 0)};
-	}
+        if ($term->[1] == $depth) {
+            $#{$term} = -1;
+            map { push @$term, $_ }
+            @{deep_copy_term_incr_depth($replacement, $depth-1, 0)};
+        }
     } elsif ($term->[0] eq "application") {
-	substitute_worker($term->[1], $depth, $replacement);
-	substitute_worker($term->[2], $depth, $replacement);
+        substitute_worker($term->[1], $depth, $replacement);
+        substitute_worker($term->[2], $depth, $replacement);
     } elsif ($term->[0] eq "abstraction" ) {
-	substitute_worker($term->[2], $depth+1, $replacement);
+        substitute_worker($term->[2], $depth+1, $replacement);
     }
 }
 
 sub deep_copy_term_incr_depth {
     my ($term, $depth, $localdepth) = @_;
     if ($term->[0] eq "var") {
-	if ($term->[1] > $localdepth) {
-	    [ "var", $term->[1]+$depth ];
-	} else {
-	    [ "var", $term->[1] ];
-	}
+        if ($term->[1] > $localdepth) {
+            [ "var", $term->[1]+$depth ];
+        } else {
+            [ "var", $term->[1] ];
+        }
     } elsif ($term->[0] eq "application") {
-	[ "application",
-	  deep_copy_term_incr_depth($term->[1], $depth, $localdepth),
-	  deep_copy_term_incr_depth($term->[2], $depth, $localdepth) ];
+        [ "application",
+          deep_copy_term_incr_depth($term->[1], $depth, $localdepth),
+          deep_copy_term_incr_depth($term->[2], $depth, $localdepth) ];
     } elsif ($term->[0] eq "abstraction") {
-	[ "abstraction",
-	  [@{$term->[1]}],
-	  deep_copy_term_incr_depth($term->[2], $depth, $localdepth+1) ];
+        [ "abstraction",
+          [@{$term->[1]}],
+          deep_copy_term_incr_depth($term->[2], $depth, $localdepth+1) ];
     }
 }
 
