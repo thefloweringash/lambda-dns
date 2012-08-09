@@ -212,7 +212,7 @@ sub alpha_fix {
             if ($term->[0] eq "abstraction") {
                 delete $syms->{$term->[1][1]};
             }}, $term);
-        $syms = [keys %$syms];
+        $syms = [sort (keys %$syms)];
     }
     if ($term->[0] eq "application") {
         alpha_fix($term->[1], $bindings, $syms);
@@ -223,7 +223,8 @@ sub alpha_fix {
         my @rest = @{$bindings}[$self+1 .. $#{$bindings}];
         for my $outer (@rest) {
             if ($outer->[1] eq $binding->[1]) {
-                $binding->[0][1][1] = pop @$syms;
+                $binding->[1] =
+                    $binding->[0][1][1] = pop @$syms;
                 last;
             }
         }
